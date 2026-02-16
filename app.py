@@ -4,7 +4,6 @@ from modules.db.db_absences import load_active_absences_db
 from modules.db.db_competitions import load_competitions_db
 from modules.db.db_players import load_players_db
 from modules.db.db_records import get_records_db
-from modules.ui.absents_ui import filtrar_jugadoras_ausentes
 from modules.util.util import clean_df, data_format
 from modules.ui.ui_app import (
     get_default_period,
