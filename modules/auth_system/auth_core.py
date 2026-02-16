@@ -1,6 +1,6 @@
 # src/auth_system/auth_core.py
 
-import datetime
+from datetime import datetime, timezone
 import uuid
 import bcrypt
 import jwt
@@ -40,7 +40,7 @@ def create_jwt(name, username, rol, session_id=None):
     if session_id is None:
         session_id = uuid.uuid4().hex
 
-    now = datetime.datetime.utcnow()
+    now = datetime.now(timezone.utc)
     exp = now + datetime.timedelta(seconds=auth_config.JWT_EXP_SECONDS)
 
     payload = {
