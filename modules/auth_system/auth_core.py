@@ -1,5 +1,3 @@
-# src/auth_system/auth_core.py
-
 from datetime import datetime, timezone, timedelta
 import uuid
 import bcrypt
