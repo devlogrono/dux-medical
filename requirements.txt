@@ -19,7 +19,7 @@ python_dateutil==2.9.0.post0
 # ======================================================
 # Base de Datos
 # ======================================================
-mysql_connector_repackaged==0.3.1
+mysql-connector-python==8.4.0
 
 # ======================================================
 # Autenticación y Seguridad
