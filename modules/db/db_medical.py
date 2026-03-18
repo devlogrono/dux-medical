@@ -1,42 +1,56 @@
+import streamlit as st
 import pandas as pd
+# --- CORRECCIÓN DE NOMBRE DE FUNCIÓN ---
+from modules.db.db_connection import get_connection 
+from modules.db.db_players import load_players_db
 
-# ==========================================
-# CATÁLOGOS Y TABLAS MAESTRAS (Punto 14)
-# ==========================================
-CAT_ESTADOS = ["Apto", "Apto con limitaciones", "No Apto", "En observación"]
-CAT_TIPOS_PRUEBA = ["Analítica Sangre", "Antropometría", "Cardiología", "Podología", "Psicología"]
-CAT_SANGRE = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
+# --- FUNCIONES DE LECTURA ---
 
-# ==========================================
-# FUNCIONES DE CONSULTA (MOCK DATA)
-# ==========================================
+def get_cat_estados_aptitud():
+    return ["Apto", "Apto con Limitaciones", "No Apto", "En Observación"]
 
-def get_medical_history_mock(player_id):
-    """
-    Simula la Entidad Ficha Médica Permanente (Punto 13).
-    Relaciona datos fijos con el ID de la jugadora.
-    """
-    data = {
-        "Jugadora A": {
-            "sangre": "A+", 
-            "alergias": "Penicilina, Polen", 
-            "cirugias": "Ligamento Cruzado Anterior (2022)"
-        },
-        "Jugadora B": {
-            "sangre": "O-", 
-            "alergias": "Ninguna conocida", 
-            "cirugias": "Artroscopia rodilla izquierda (2023)"
-        }
-    }
-    return data.get(player_id, {"sangre": "N/A", "alergias": "N/A", "cirugias": "N/A"})
+def get_clasificacion_cirugias():
+    return ["Traumatológica (MI)", "Traumatológica (MS)", "General", "Ginecológica"]
 
-def get_evaluations_mock(player_id):
-    """
-    Simula la Entidad Evaluaciones (Relación 1 a Muchos).
-    Muestra el histórico de pruebas de la jugadora.
-    """
-    evals = [
-        {"Fecha": "2026-01-10", "Tipo": "Analítica Sangre", "Resultado": "Óptimo", "Hierro": 45},
-        {"Fecha": "2026-02-15", "Tipo": "Antropometría", "Resultado": "Apto", "Hierro": 38}
-    ]
-    return pd.DataFrame(evals)
+def get_tipos_evaluacion():
+    return ["Analítica", "Nutrición", "Cardiología", "Ginecología", "Odontología"]
+
+# --- FUNCIONES DE ESCRITURA (Ajustadas con get_connection) ---
+
+def save_medical_evaluation(player_id, eval_type, status, notes):
+    try:
+        conn = get_connection() # Nombre corregido
+        if conn is None: return False
+        
+        cursor = conn.cursor()
+        query = """
+            INSERT INTO medical_evaluations (player_id, eval_type, status, notes, eval_date)
+            VALUES (%s, %s, %s, %s, CURDATE())
+        """
+        cursor.execute(query, (player_id, eval_type, status, notes))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Error al guardar evaluación: {e}")
+        return False
+
+def save_surgery_record(player_id, surgery_date, classification, procedure_name):
+    try:
+        conn = get_connection() # Nombre corregido
+        if conn is None: return False
+        
+        cursor = conn.cursor()
+        query = """
+            INSERT INTO medical_surgeries (player_id, surgery_date, classification, procedure_name)
+            VALUES (%s, %s, %s, %s)
+        """
+        cursor.execute(query, (player_id, surgery_date, classification, procedure_name))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Error al guardar cirugía: {e}")
+        return False
