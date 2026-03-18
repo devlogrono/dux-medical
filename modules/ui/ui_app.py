@@ -5,7 +5,8 @@ from datetime import date, timedelta
 from modules.app_config.styles import template_COLOR_NORMAL, template_COLOR_INVERTIDO, get_color_template
 from modules.util.util import ordenar_df
 from modules.i18n.i18n import t
-
+from modules.ui import medical_ui
+from modules.ui import medical_ui, registros_ui
 W_COLS = ["recuperacion", "energia", "sueno", "stress", "dolor"]
 
 # ============================================================
@@ -616,3 +617,53 @@ def get_pendientes_check(df_periodo: pd.DataFrame, df_jugadoras: pd.DataFrame):
     pendientes_out = _filtrar_pendientes(df_periodo, df_jugadoras, "checkout")
 
     return pendientes_in, pendientes_out
+def render_main_layout():
+    """
+    Función maestra con los iconos tipo Material para una estética profesional.
+    """
+    with st.sidebar:
+        st.image("assets/images/logo.png", width=150)
+        st.title("DUX Medical System")
+        st.write("---")
+        
+        # 1. Selector de Módulo (Lo subimos para que defina la variable antes que nada)
+        st.markdown("### :material/apps: Seleccione Módulo")
+        modulo_activo = st.selectbox("Módulos:", ["Módulo Médico Integral", "Otros módulos..."], label_visibility="collapsed")
+        st.write("---")
+
+        # 2. Sección: Análisis y Estadísticas
+        st.markdown("### :material/monitoring: Análisis y Estadísticas")
+        menu_analisis = st.radio("Navegación:", ["Individual", "Grupal"], key="radio_analisis", label_visibility="collapsed")
+        st.write("---")
+        
+        # 3. Sección: Administración
+        st.markdown("### :material/settings: Administración")
+        menu_admin = st.radio("Admin:", ["Registros", "Developer"], key="radio_admin", label_visibility="collapsed")
+        
+        # Botón con estilo compacto
+        if st.button(":material/refresh: Limpiar cache & reiniciar"):
+            st.cache_data.clear()
+            st.rerun()
+            
+        st.write("---")
+
+    # --- Lógica de enrutamiento corregida y jerarquizada ---
+
+    # Primero verificamos que estemos en el módulo médico
+    if modulo_activo == "Módulo Médico Integral":
+        
+        # Prioridad 1: Si el usuario seleccionó "Registros" en Administración
+        if menu_admin == "Registros":
+            registros_ui.render_registros_module()
+        
+        # Prioridad 2: Si el usuario está navegando en Análisis Individual
+        elif menu_analisis == "Individual":
+            # Aquí llamaremos a la función de José cuando esté lista
+            medical_ui.render_medical_module() 
+        
+        # Por defecto: Cargar el panel médico integral
+        else:
+            medical_ui.render_medical_module()
+    
+    else:
+        st.info("Seleccione el Módulo Médico Integral en la barra lateral para comenzar.")
