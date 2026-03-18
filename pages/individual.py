@@ -24,11 +24,13 @@ if not jugadora:
     st.stop()
 
     #st.subheader("RPE / Cargas")
+
+player_block_dux(jugadora)
+
 if df_filtrado is None or df_filtrado.empty:
     st.info(t("No hay registros aún (se requieren Check-out con UA calculado)."))
     st.stop()
 
-player_block_dux(jugadora)
 metricas(df_filtrado, jugadora, turno, start, end)
 
 icon, desc, acwr, fatiga = calcular_semaforo_riesgo(df_filtrado)
