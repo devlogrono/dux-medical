@@ -1,9 +1,17 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-# --- IMPORTACIONES ---
-from modules.db.db_players import load_players_db
-from modules.db.db_medical import (
+import sys
+import os
+
+# --- CONEXIÓN CON LA ESTRUCTURA ---
+current_dir = os.path.dirname(__file__)
+modules_dir = os.path.abspath(os.path.join(current_dir, ".."))
+if modules_dir not in sys.path:
+    sys.path.append(modules_dir)
+
+from db.db_players import load_players_db
+from db.db_medical import (
     get_tipos_evaluacion, 
     get_cat_estados_aptitud, 
     get_clasificacion_cirugias,
@@ -11,103 +19,81 @@ from modules.db.db_medical import (
     save_surgery_record
 )
 
-def render_registros_module():
-    st.header("📋 Historial Médico: Perfil de Jugadora")
+try:
+    from reports.ui_individual import player_block_dux
+except ImportError:
+    from modules.reports.ui_individual import player_block_dux
 
-    # --- 1. CARGA DE DATOS REALES ---
+def render_registros_module():
+    st.title("📋 Historial Médico: Perfil de Jugadora")
+
     jug_df = load_players_db()
     
-    columna_nombre = 'nombre_jugadora'
-
     if jug_df is not None and not jug_df.empty:
-        if columna_nombre not in jug_df.columns:
-            columna_nombre = jug_df.columns[2] 
+        col_nombre = 'nombre_jugadora'
+        listado_jugadoras = ["Seleccionar..."] + sorted(jug_df[col_nombre].dropna().unique().tolist())
+        jugadora_sel = st.selectbox("👤 Seleccione la Jugadora:", listado_jugadoras)
         
-        listado_jugadoras = ["Seleccionar..."] + sorted(jug_df[columna_nombre].dropna().astype(str).unique().tolist())
-    else:
-        st.error("No se pudieron cargar las jugadoras.")
-        return
+        st.divider()
 
-    jugadora_seleccionada = st.selectbox(
-        "👤 Seleccione la Jugadora para consultar o registrar datos:", 
-        listado_jugadoras,
-        index=0
-    )
+        if jugadora_sel != "Seleccionar...":
+            fila_jugadora = jug_df[jug_df[col_nombre] == jugadora_sel].iloc[0]
+            datos_jugadora = fila_jugadora.to_dict()
+            player_id = datos_jugadora.get('id_jugadora')
 
-    st.write("---")
+            # --- LÓGICA DE FOTOS ---
+            url_final = datos_jugadora.get("foto_url_drive") if pd.notna(datos_jugadora.get("foto_url_drive")) else datos_jugadora.get("foto_url")
+            datos_jugadora["foto_url"] = url_final if url_final and not pd.isna(url_final) else None
 
-    if jugadora_seleccionada == "Seleccionar...":
-        st.info("Por favor, selecciona una jugadora para desplegar su ficha médica.")
-        return
+            # Componente visual de José
+            player_block_dux(datos_jugadora)
 
-    # Extraemos los datos de la jugadora
-    datos_jugadora = jug_df[jug_df[columna_nombre].astype(str) == jugadora_seleccionada].iloc[0]
-    
-    def clean_val(val):
-        return str(val) if pd.notna(val) and str(val).lower() not in ["none", "nan", ""] else "No registrado"
+            st.divider()
 
-    player_id_real = clean_val(datos_jugadora.get('id_jugadora'))
-
-    # --- 🟢 ENCABEZADO: FICHA RESUMIDA ---
-    with st.container(border=True):
-        col_foto, col_datos = st.columns([1, 3])
-        
-        # Ajuste de Foto: Probamos con foto_url o imagen (común en otros módulos)
-        foto_url = datos_jugadora.get('foto_url', datos_jugadora.get('foto_url_drive', datos_jugadora.get('imagen')))
-        
-        if not foto_url or pd.isna(foto_url) or str(foto_url).strip() == "":
-            foto_url = "https://cdn-icons-png.flaticon.com/512/166/166344.png" 
-
-        with col_foto:
-            # Si es URL de Drive, a veces necesita un formateo especial, 
-            # pero por ahora intentamos mostrarla directamente.
-            st.image(foto_url, width=120)
-        
-        with col_datos:
-            st.subheader(f"Ficha Técnica: {jugadora_seleccionada}")
-            c1, c2, c3 = st.columns(3)
-            c1.write(f"**ID:** {player_id_real}")
-            # Si en otros módulos se ve, 'posicion' y 'dorsal' deberían funcionar
-            c2.write(f"**Posición:** {clean_val(datos_jugadora.get('posicion'))}") 
-            c3.write(f"**Dorsal:** {clean_val(datos_jugadora.get('dorsal'))}")
-            st.write(f"**Plantel:** {clean_val(datos_jugadora.get('plantel'))}")
-
-    st.write("---")
-
-    # --- 🟡 CUERPO: LAS 3 SECCIONES DEL MÓDULO ---
-
-    # 1. EVALUACIONES (La que ya tenías)
-    with st.expander("➕ REGISTRAR NUEVA EVALUACIÓN", expanded=True):
-        with st.form("form_evaluacion"):
             c1, c2 = st.columns(2)
-            with c1: tipo_eval = st.selectbox("Tipo de Evaluación:", get_tipos_evaluacion())
-            with c2: estado = st.selectbox("Estado Resultante:", get_cat_estados_aptitud())
-            notas_eval = st.text_area("Resultados / Observaciones:")
-            if st.form_submit_button("Guardar Evaluación en AWS"):
-                if save_medical_evaluation(player_id_real, tipo_eval, estado, notas_eval):
-                    st.success("Guardado correctamente.")
-                else:
-                    st.error("Error al guardar en AWS.")
-
-    # 2. SECCIÓN CIRUGÍAS (Restaurada)
-    with st.expander("✂️ HISTORIAL QUIRÚRGICO", expanded=False):
-        with st.form("form_cirugias"):
-            col1, col2 = st.columns(2)
-            with col1:
-                tipo_ciru = st.selectbox("Clasificación:", get_clasificacion_cirugias())
-                fecha_ciru = st.date_input("Fecha de Cirugía:", date.today())
-            with col2:
-                proc_ciru = st.text_input("Procedimiento Realizado:")
             
-            if st.form_submit_button("Registrar Cirugía"):
-                if save_surgery_record(player_id_real, fecha_ciru, tipo_ciru, proc_ciru):
-                    st.success("Cirugía registrada exitosamente.")
-                else:
-                    st.error("Error al registrar cirugía.")
+            with c1:
+                with st.expander("➕ NUEVA EVALUACIÓN MÉDICA", expanded=True):
+                    # El cargador de archivos debe estar fuera del formulario
+                    archivo_pdf = st.file_uploader("1. Adjuntar Informe (PDF)", type=["pdf"], key="pdf_uploader_registros")
+                    
+                    with st.form("eval_form", clear_on_submit=True):
+                        st.write("2. Detalles de la Evaluación")
+                        tipo = st.selectbox("Tipo de Evaluación", get_tipos_evaluacion())
+                        estado = st.selectbox("Estado de Aptitud", get_cat_estados_aptitud())
+                        obs = st.text_area("Resultados y Observaciones", placeholder="Escriba aquí los detalles...")
+                        
+                        if st.form_submit_button("Guardar Evaluación", use_container_width=True):
+                            # 1. Intentar guardar datos en AWS
+                            if save_medical_evaluation(player_id, tipo, estado, obs):
+                                st.success("✅ Datos guardados en AWS")
+                                
+                                # 2. Lógica de guardado físico del archivo
+                                if archivo_pdf:
+                                    try:
+                                        save_path = os.path.join("assets", "documents", "evaluaciones")
+                                        # Creamos un nombre único: ID_FECHA_NOMBRE.pdf
+                                        file_name = f"{player_id}_{date.today()}_{archivo_pdf.name}"
+                                        full_path = os.path.join(save_path, file_name)
+                                        
+                                        with open(full_path, "wb") as f:
+                                            f.write(archivo_pdf.getbuffer())
+                                        
+                                        st.info(f"📎 Archivo guardado físicamente en: {file_name}")
+                                    except Exception as e:
+                                        st.error(f"❌ Error al guardar el archivo físico: {e}")
+                                else:
+                                    st.warning("⚠️ Registro creado sin archivo adjunto.")
 
-    # 3. SECCIÓN DOCUMENTOS (Restaurada)
-    with st.expander("📁 GESTIÓN DOCUMENTAL", expanded=False):
-        st.write("Suba exámenes médicos o analíticas (PDF/JPG):")
-        archivo = st.file_uploader("Seleccionar archivo", type=['pdf', 'jpg', 'png'], key="doc_med")
-        if archivo:
-            st.info("Archivo cargado temporalmente. La integración con S3 estará disponible pronto.")
+            with c2:
+                with st.expander("✂️ REGISTRO DE CIRUGÍAS", expanded=True):
+                    with st.form("ciru_form", clear_on_submit=True):
+                        tipo_c = st.selectbox("Clasificación de la Cirugía", get_clasificacion_cirugias())
+                        fecha = st.date_input("Fecha", date.today())
+                        proc = st.text_input("Procedimiento", placeholder="Ej: Plastia de LCA")
+                        
+                        if st.form_submit_button("Registrar Cirugía", use_container_width=True):
+                            if save_surgery_record(player_id, fecha, tipo_c, proc):
+                                st.success("✅ Cirugía registrada correctamente")
+    else:
+        st.error("Error al cargar la base de datos de jugadoras.")
