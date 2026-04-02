@@ -37,23 +37,28 @@ def load_players_db() -> pd.DataFrame | None:
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-    #st.dataframe(df)
     
-    # Normalización
+    # Normalización de textos
     df["nombre"] = df["nombre"].astype(str).str.strip().str.title()
     df["apellido"] = df["apellido"].astype(str).str.strip().str.title()
 
+    # Creación de nombre completo
     df["nombre_jugadora"] = (df["nombre"] + " " + df["apellido"]).str.strip()
 
+    # --- CORRECCIÓN: SE INCLUYEN TODAS LAS COLUMNAS NECESARIAS PARA LA FICHA ---
     orden = [
         "id", "id_jugadora", "nombre_jugadora", "nombre", "apellido", "posicion", "plantel",
         "dorsal", "nacionalidad", "altura", "peso", "fecha_nacimiento",
-        "genero", "foto_url"
+        "genero", "foto_url", "foto_url_drive" 
     ]
+    
+    # Filtramos solo las columnas que existen en el DF
     df = df[[c for c in orden if c in df.columns]]
 
+    # Mapeo de posiciones (Portera, Defensa, etc.)
     df["posicion"] = df["posicion"].map(MAP_POSICIONES).fillna(df["posicion"])
 
+    # Limpieza final de columnas auxiliares
     df = df.drop(columns=["nombre", "apellido"], errors="ignore")
 
     return df
